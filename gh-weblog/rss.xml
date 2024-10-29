@@ -4,76 +4,10 @@
 <atom:link href="https://pomax.github.io/gh-weblog/rss.xml" rel="self" type="application/rss+xml" />
 <title>Pomax.github.io</title>
 <description>Because chronicling the past using technology is kind of cool.</description>
-<link>https://pomax.github.io/</link>
-<lastBuildDate>Tue, 15 Oct 2024 16:04:11 GMT</lastBuildDate>
-<pubDate>Tue, 15 Oct 2024 16:04:11 GMT</pubDate>
+<link>http://localhost:8000/index.html</link>
+<lastBuildDate>Tue, 29 Oct 2024 22:39:12 GMT</lastBuildDate>
+<pubDate>Tue, 29 Oct 2024 22:39:12 GMT</pubDate>
 <ttl>1440</ttl><item>
-<title># Updating my blog platform</title>
-<description><![CDATA[<h1 id="updating-my-blog-platform">Updating my blog platform</h1>
-<p>I updated my blog platform, for reasons. One of them being the current Wordpress shenanigans,  causing the most important person in my life to go &quot;...didn&#39;t you have a GitHub-hosted blog? Is that something I can use too?&quot; and while her eventual solution was to discover that I have a Dreamhost account that comes with a free hosted self-managed WP install (so she can stop funding Automaticc), I spent a bunch of time trying to clean up my blog code so it could be used by others again. </p>
-<p>I originally wrote it back in 2014 back when React was still on version 0.12, and revisiting the code it&#39;s incredible to see how much nicer React was back then, compared to the monster it has become since. So I decided to rewrite it, but keep it React 0.12, and honest, I wish there was a modern &quot;classic React&quot; library, but JS doesn&#39;t stop working this should keep working forever just fine. </p>
-<h3 id="how-does-it-work-">How does it work?</h3>
-<p>Some architecture info: my blog platform uses GitHub as its backend, but <em>it</em> uses GitHub as a backend, you don&#39;t. It has a simple &quot;swap out post for a markdown editor&quot; interface when you create/edit posts, and when you save your post the client-side code literally posts commits to GitHub, and then GitHub runs its GitHub pages deploy and things just work. Of course, this requires a bit more than just &quot;save your post&quot;:</p>
-<ol>
-<li>the code saves your post text</li>
-<li>it also saves post metadata like title, created_at, updated_at, tags, etc.</li>
-<li>it also saves an updated index of all posts in the blog, consisting of only the post id, title, and tags, so that even if you&#39;re only looking at a handful (or one) post, it can show you the entire post history as a ToC</li>
-<li>it also saves an updated RSS.xml file</li>
-<li>and finally, it saves redirects. GitHub pages don&#39;t come with mod_rewrite or a redirect table, so instead that&#39;s done using actual files.</li>
-</ol>
-<p>Edits do the same thing, and deletes run those in reverse: all files that got written are committed as &quot;deleted&quot;, and the post is stripped from the index so that the index and RSS.xml files no longer include it.</p>
-<h3 id="making-the-browser-talk-to-github">Making the browser talk to GitHub</h3>
-<p>The thing I did really have to update was the Github API connector: back in 2014 there <em>was</em> no official JS API for GitHub.</p>
-<p><a href="https://philschatz.com">Phil Schatz</a> had just released <a href="https://philschatz.com/2013/03/10/octokit">octokit</a>, using the same name as Github&#39;s official API libraries for &quot;not JS&quot; languages, which became <a href="https://philschatz.com/2014/05/25/octokat/">octokat</a> not too long after, when Github realised that maybe it would make sense to offer their octokit library in the language used by the overwhelming majority of web developers, and the octokit project got handed over to GitHub (so now <a href="https://www.npmjs.com/package/octokit">octokit is an official Github release</a>) but by the time all of that happened I was already done writing my blog and I had no reason to upgrade.</p>
-<p>However, now I do, and the official API is frankly a bit of a shit experience? But it works, and it&#39;s got support, so... &quot;yay&quot;? You have three options:</p>
-<ol>
-<li>use the <code>requests</code> based API, where you write http verbs and enpoint URLs. E.g. <code>await octokit.request(`GET /repos/${user}/${repo}/actions/runs`)</code>,</li>
-<li>use the rest API extension, so you can write <code>await octokit.repos(user, repo).actions.runs()</code>, or</li>
-<li>use a plugin if there is one for the exact thing you want, like &quot;uploading a text file without manually running every git step&quot;, e.g. <code>await octokit.createOrUpdateTextFile({ owner, repo, branch, path: `${this.path}/rss.xml`, content: rss, message: `Update to RSS` });</code></li>
-</ol>
-<p>For most of this blog&#39;s work, the latter is perfectly adequate (although I do <a href="https://github.com/octokit/plugin-create-or-update-text-file.js/issues/295#issuecomment-2408704495">wish it supported createOrUpdateTextFiles</a>, plural), so the client-side code simply figures out which files need to be written with what content, and sends those off as commits. Then it uses option 1 to poll the <code>actions</code> endpoint to see if the GitHub pages deploy (which GitHub automatically kicks off without a workflow file - handy!) has finished yet, and colours the admin button red to let you know others won&#39;t see your content yet because the website&#39;s still rebuilding.</p>
-<h4 id="-how-does-it-authenticate-">&quot;how does it authenticate?&quot;</h4>
-<p>Auth uses a fine-grained GitHub token. Another thing that didn&#39;t exist back in 2014: you could generate a token and give that commit write access, and good news you just allowed that for every single repo you had access to. It was... insane? It took GitHub way too long to finally add normal tokens that let you specify exactly which repo(s) it should apply to, but <a href="https://github.com/settings/tokens?type=beta">now that we have those</a>: </p>
-<ol>
-<li>you click the admin button</li>
-<li>you fill in your username, repo name, gh-pages branch, the subdir your gh-weblog content should live in, and that token</li>
-<li>you are now authenticated and you can use the admin interface. </li>
-</ol>
-<p>And note that that works regardless of whether the token is valid or not: if it&#39;s not, nothing you do will actually get saved but you&#39;re free to dick around in the admin &quot;interface&quot;: it&#39;s <a href="https://github.com/pomax/pomax.github.io">an open source blog</a>, what are you going to do, discover that it&#39;s actually markdown?</p>
-<h3 id="rss">RSS</h3>
-<p>It&#39;s a blog, it should have RSS. The blog simply grabs the most recent 10 entries, and wraps that in RSS 2.0 XML markup, then sends that off to Github as a regular text file, because it is. Nothing super special there, and because it&#39;s just &quot;more gh-pages content&quot; there&#39;s nothing else to do. Once the site&#39;s redeployed, everyone&#39;s RSS feed readers will see the update(s).</p>
-<h3 id="mod_rewrite">mod_rewrite</h3>
-<p>Since everything&#39;s done through a client-side library, there&#39;s a bit of a problem when it comes to &quot;showing a single blog post&quot;. Obviously if you want the post feed you just to <a href="https://pomax.github.io">https://pomax.github.io</a>, but if you want to see, say, this specific post, you can visit <a href="https://pomax.github.io/pages/1728925663194/updating-my-blog-platform">https://pomax.github.io/pages/1728925663194/updating-my-blog-platform</a> and that works. Even though it&#39;s actually still using <a href="https://pomax.github.io">https://pomax.github.io</a> with a <code>?postid=1728925663194/</code> query argument.</p>
-<p>The way this works is that the blog library literally writes a file called <code>./pages/1728925663194/updating-my-blog-platform/index.html</code> into the repo to handle the redirect. Here&#39;s what&#39;s in it:</p>
-<pre><code class="lang-html">&lt;meta http-equiv=&quot;refresh&quot; content=&quot;0; url=../../../index.html?postid=1728925663194&quot;&gt;
-</code></pre>
-<p>That&#39;s it. HTML-based mod<em>rewrite. Sure, it&#39;s more files on the repo, but they&#39;re organized extremely obviously, and the blog platform will clean them up if you delete posts, so you click a post link, your browser simply loads a _real html index file</em>, sees the redirect, and instantly loads the homepage again. </p>
-<p>And then the homepage sees it&#39;s supposed to load a single post, runs a <code>history.replaceState</code> to make the URL look like the one you actually clicked (which, remember, is a <em>real URL</em> with a real file at that URL) and everything works as you expect.</p>
-<h3 id="image-uploads">image uploads</h3>
-<p>The one thing I&#39;ve not re-uplifted is image drag-and-drop so that I can just drag images into my blog posts as I&#39;m writing them. It&#39;s not a ton of work, but it&#39;s also not trivial, as there are no convenience plugins available for that, so to upload an image &quot;on drop&quot;, you need to:</p>
-<ol>
-<li>create a blob on GitHub</li>
-<li>get the blob sha</li>
-<li>create a commit tree for that blob</li>
-<li>create a commit to put that commit tree into</li>
-<li>update the head ref to point to that commit</li>
-<li>then drop the blob sha into the markdown as image code.</li>
-</ol>
-<p>Everything in that list is entirely doable but also the kind of pain I&#39;d rather do &quot;in follow-up&quot; compared to holding the new platform deployment.</p>
-<h3 id="post-folding">post folding</h3>
-<p>Post folds are a pure HTML+CSS solution, no JS involved. It exploits the fact that <code>&lt;details&gt;</code> has been part of HTML 5 since its release, so if a post is over 1500 characters, the first few paragraphs are wrapped in a <code>&lt;summary&gt;</code> tag, and then CSS is used to replace the usual &quot;drop down triangle&quot; to the left of the summary into a normal looking &quot;show entire post&quot; button at the bottom instead. Click it, and the  full <code>&lt;details&gt;</code> element becomes visible, with some CSS that removes the button using the <code>details[open]</code> selector.</p>
-<p>No-JS solutions are the best solutions, even if your website <em>relies</em> on JS to work at all. Heck, I&#39;d argue <em>especially</em> when your site relies on JS, you should aim to not use JS as much as possible.</p>
-<p>Anyway, that&#39;s it, new blog platform, I still have some cleanup and final features left to do, but I&#39;ll probably write another post on it once it&#39;s ready for you to fork. Because that&#39;s all you should have to do: fork it, rename your fork to <code>yourusername.github.io</code>, enable pages for the <code>main</code> branch, and... that&#39;s it. Customize the CSS if you really want (you probably do?) but that&#39;s optional, you already have a blog online now. Sure, you&#39;re going to have to generate a token so you can actually <em>post</em> but the instructions will cover that.</p>
-<p>Until then, I&#39;m hoping to blog more often now that things are back to convenience levels of functional.</p>
-]]></description>
-<category>blog</category>
-<category>update</category>
-<category>news</category>
-<link>https://pomax.github.io?postid=1728925663194</link>
-<guid>https://pomax.github.io?postid=1728925663194</guid>
-<pubDate>Mon, 14 Oct 2024 17:07:43 GMT</pubDate>
-</item>
-<item>
 <title> Using flight simulation rudder pedals as MIDI pedals</title>
 <description><![CDATA[<p>Did you know that there isn&#39;t just a dumb, simple Windows utility for turning a joystick or game controller into a MIDI device? Sure. you can find 15 year old utilities (that have no docs, so good luck figuring out why they don&#39;t work even if they <em>run</em>), and yes, you can find some dedicated &quot;profile&quot; utils that map specific game controller buttons to specific MIDI outs, but like... I have <a href="https://www.vkbcontrollers.com/products/t-rudders-mk-v-rudder-pedals">VKB-Sim rudder pedals</a> because <a href="https://pomax.github.io/are-we-flying/">I might like flight sim a little too much</a> and not a minute goes by while I&#39;m sitting at my desk that my feet don&#39;t think they&#39;re resting on sostenuto and sustain pedals. Because there&#39;s also a keyboard sitting on my desk. </p>
 <p>So can I please just get something that actually turns them into that when I need them to?</p>
