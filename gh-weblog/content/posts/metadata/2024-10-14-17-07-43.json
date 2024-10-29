@@ -8,5 +8,6 @@
     "blog",
     "update",
     "news"
-  ]
+  ],
+  "draft": false
 }
